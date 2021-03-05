@@ -4,10 +4,10 @@
 #include <stdio.h> 
 #include <malloc.h> 
 #include <errno.h> 
-// #define NULL 0
+#include <string.h>
 int main()
 {
-    pid_t 	var1;
+    pid_t 	pidChild;
 	char* 	line = NULL;
     size_t 	size = 0;
     printf("> ");
@@ -18,21 +18,15 @@ int main()
 	}
 	char** args = malloc(sizeof(char*));
 	if (line[str_len-1]=='\n'){
-		line[str_len-1]=='\0';
-		printf("nullllll\n");
+		line[str_len-1]='\0';
 	}
-	// args [0]= line;
-	args [0]= "/bin/ps";
-	printf("%d %s\n",str_len,args[0]);
-	// args [1]= "\0";
-    var1 = fork();
-    if(var1 == 0)//if child
+	args [0]= line;
+    pidChild = fork();
+    if(pidChild == 0)//if child
     {
-    // execvp(args[0], args);
-	        if (execvp(args[0], args) == -1) {
-            printf("[ERROR] Couldn't execute unknown command!\n");
-        }
-    // execv("/bin/ps", "/bin/ps", NULL);
+		if (execvp(args[0], args) == -1) {
+            perror("ERROR ");
+		}
     }
     else//if parent
     {
