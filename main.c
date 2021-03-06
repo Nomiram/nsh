@@ -11,15 +11,17 @@ int main()
     pid_t 	pidChild;
 	char* 	line = NULL;
     size_t 	size = 0;
-	size_t	buf_size=10;
-	
-    printf("> ");
+	size_t	termcnt=10;//количество лексем
+	int s = 1;
+	char** args = (char**)malloc(sizeof(char*) * termcnt);
+	while (s){
+		printf("> ");
 	
 	int str_len = getline(&line, &size, stdin);
 	if(str_len==-1){
 		printf("error\n");
 	}
-	char** args = (char**)malloc(sizeof(char*) * buf_size);
+	
 	if (line[str_len-1]=='\n'){
 		line[str_len-1]='\0';
 	}
@@ -30,13 +32,16 @@ int main()
     {
 		
 	    args[ptr]=istr;
-		
-	    if(ptr>buf_size-1){
-			args=realloc(args,sizeof(char*)*buf_size*2);
+		// printf("PTR = %p\n",istr);
+	    if(ptr>termcnt-1){
+			args=realloc(args,sizeof(char*)*termcnt*2);
 	    }
         istr = strtok (NULL,sep);
     }
 	args[ptr]=NULL;
+	if(strcmp(args[0],"exit")==0){
+		break;
+	}
     if((pidChild = fork())==-1){
 		perror("ERROR ");
 	}
@@ -49,12 +54,12 @@ int main()
     }
     else//if parent
     {
-	waitpid(pidChild, 0,0);
-	
-	free(line);
-	free(args);
+		waitpid(pidChild, 0,0);
     }
 
+	}//end main loop
+    free(line);
+	free(args);
 
     return 0;
 }
