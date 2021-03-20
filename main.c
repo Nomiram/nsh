@@ -17,7 +17,7 @@
 ///<remarks>Входная строка изменяется в функции. Сохраняйте копию строки, если она будет нужна далее</remarks>
 ///<returns>Возвращает массив строк, разбитых по " \t". Последняя строка = NULL</returns>
 ///</summary>
-char** strtoarr(char* str);
+char** strtoarr (char* str);
 ///<summary>
 ///<remarks>Функция пытается найти и выполнить встроенные возможности терминала: exit, cd, njobs, nkill</remarks>
 ///<param name="prm">Массив параметров</param>
@@ -26,11 +26,12 @@ char** strtoarr(char* str);
 ///0, если ключевое слово не найдено; 
 ///-1, если необходимо завершить работу терминала(exit)</returns>
 ///</summary>
-int    shexec  (char** prm);
-int    execute (char** args,  int isBackground);
+int    shexec   (char** prm);
+int    execute  (char** args,  int isBackground);
+void   intsignal(int sig);
 struct bgproc{
-	pid_t pid;           //process ID
-	char name[256]={0};  //максимальная длина имени файла в Linux - 255
+	pid_t pid;       //process ID
+	char name[256];  //максимальная длина имени файла в Linux - 255
 };
 /*
 int flagkilljobs=0;
@@ -60,31 +61,36 @@ void intsignal(){
 }
 while(1){
 	...
-	flagAvil=0;
+	flagAvail=0;
 	...
 	if(flagkilljobs=1){
 		nkill(jobs);
 		flagkilljobs=0;
 	}
-	flagAvil=1
+	flagAvail=1;
 }
 */
+/*ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ*/
+int flagAvail = 1;
+int 	maxproccnt   = STARTPROCCNT;	//максимальное количество процессов
+int 	curproccnt   = 0;				//количество процессов в фоне
+struct bgproc* jobs;//массив процессов в фоне
 int main()
 {
+	jobs  = malloc(sizeof(struct bgproc) * maxproccnt);
+	signal(SIGINT,intsignal);
+	signal(SIGTERM,intsignal);
 	char* 	line         = NULL;			//строка для ввода
     size_t 	size         = 0;				//размер буфера
 	int     isBackground = false;			//флаг фонового режима запуска
 	char**  args;							//массив аргументов
-	int 	maxproccnt   = STARTPROCCNT;	//максимальное количество процессов
-	int 	curproccnt   = 0;				//количество процессов в фоне
-	bgproc* jobs         = (bgproc)malloc(sizeof(bgproc) * maxproccnt);//массив процессов в фоне
 	while (true){
 		printf("> ");
 	
 	int str_len = getline(&line, &size, stdin);
 	if(str_len == -1){
-		perror("error\n");
-		exit(0);
+		printf("\n");
+		continue;
 	}
 	if(str_len==1){
 		continue;
@@ -116,9 +122,13 @@ int main()
 	}//end main loop
     free(line);
 	free(args);
-
+	free(jobs);
     return 0;
 }// END MAIN
+
+void intsignal(int sig){
+	printf("int signal\n");
+}
 
 char** strtoarr(char* str)
 {
@@ -157,6 +167,18 @@ int shexec(char** prm){
 		}
 		return true;
 	}
+	if(strcmp(prm[0], "njobs") == 0){
+		flagAvail=0;
+		if(curproccnt==0){
+			printf("no bg jobs\n");
+		}
+		for(int i=0; i<curproccnt-1;i++){
+			printf("jobs:\n");
+			printf("\t[%i]\t%s",jobs[i].pid,jobs[i].name);
+		}
+		flagAvail=1;
+		return true;
+	}
 	return false;
 }
 int execute(char** args, int isBackground){
@@ -171,12 +193,17 @@ int execute(char** args, int isBackground){
             perror(args[0]);
 			return false;
 		}
-    }
+    } 
     else//if parent
     {
 		if(isBackground){
-			printf("[%d: %d]\n", 1, pidChild);//TODO
-			
+			printf("bg [%d: %d]\n", curproccnt, pidChild);//TODO
+			flagAvail=0;
+			jobs[curproccnt].pid = pidChild;
+			memcpy(jobs[curproccnt].name,args[0],strlen(args[0]));
+			curproccnt++;
+			// printf("\t[%i]\t%s",jobs[curproccnt].pid,jobs[curproccnt].name);
+			flagAvail=1;
 		}
 		else{
 			waitpid(pidChild, 0,0);
