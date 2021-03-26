@@ -172,9 +172,9 @@ int shexec(char** prm){
 		if(curproccnt==0){
 			printf("no bg jobs\n");
 		}
-		for(int i=0; i<curproccnt-1;i++){
 			printf("jobs:\n");
-			printf("\t[%i]\t%s",jobs[i].pid,jobs[i].name);
+		for(int i=0; i<curproccnt;i++){
+			printf("  [%i:%i]\t%s\n",i,jobs[i].pid,jobs[i].name);
 		}
 		flagAvail=1;
 		return true;
@@ -200,7 +200,7 @@ int execute(char** args, int isBackground){
 			printf("bg [%d: %d]\n", curproccnt, pidChild);//TODO
 			flagAvail=0;
 			jobs[curproccnt].pid = pidChild;
-			memcpy(jobs[curproccnt].name,args[0],strlen(args[0]));
+			memcpy(jobs[curproccnt].name,args[0],strlen(args[0])+1);
 			curproccnt++;
 			// printf("\t[%i]\t%s",jobs[curproccnt].pid,jobs[curproccnt].name);
 			flagAvail=1;
@@ -210,4 +210,7 @@ int execute(char** args, int isBackground){
 			return true;
 		}
     }
+}//end execute
+int killjobs(){
+	
 }
