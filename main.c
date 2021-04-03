@@ -64,8 +64,8 @@ struct bgproc{
 	char name[256];  //максимальная длина имени файла в Linux - 255
 };
 /*ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ*/
-int flagAvail = 1;
-int flagKill  = 0;
+int flagAvail        = 1;
+int flagKill         = 0;
 int 	maxproccnt   = STARTPROCCNT;	//максимальное количество процессов
 int 	curproccnt   = 0;				//количество процессов в фоне
 struct bgproc* jobs;                    //массив процессов в фоне
@@ -82,21 +82,25 @@ int main()
 	char**  args;							//массив аргументов
 	ShowHelp();
 	while (true){
-		printf("> ");
-	
+	//печать приглашения к вводу
+	printf("> ");
+	//получение информации с stdin
 	int str_len = getline(&line, &size, stdin);
 	if(str_len == -1){
 		printf("\n");
 		continue;
 	}
+	//если пустая строка, то продолжить с начала
 	if(str_len==1){
 		continue;
 	}
-
+	//убрать лишние символы
 	if (line[str_len-1]=='\n'){
 		line[str_len-1]='\0';
 	}
+	//парсим строку
     args = strtoarr(line);
+	//попытка выполнить встроенную функцию
 	int ans = shexec(args);
 	if      (ans == true){
 		free(args);
@@ -105,12 +109,14 @@ int main()
 	if      (ans == exitloop){
 		break;
 	}
+	//проверка на асинхронность
 	for(int i=0; args[i] != NULL; i++){
 		if(strcmp(args[i],"&")==0){
 			isBackground = true;
 			args[i] = NULL;
 		}
 	}
+	//попытка запустить программу 
 	if(execute(args, isBackground) == false){
 		break;
 	}
