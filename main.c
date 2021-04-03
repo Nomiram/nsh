@@ -1,3 +1,7 @@
+/*
+Вопросы:
+1. Variable 'flagAvail' is reassigned a value before the old one has been used if variable is no semaphore variable.
+*/
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -13,77 +17,70 @@
 #define false 0
 #define exitloop -1
 ///<summary>
-///<param name="str">Строка, которую необходимо разделить на лексемы</param>
-///<remarks>Входная строка изменяется в функции. Сохраняйте копию строки, если она будет нужна далее</remarks>
-///<returns>Возвращает массив строк, разбитых по " \t". Последняя строка = NULL</returns>
+///<para>Входная строка изменяется в функции. Сохраняйте копию строки, если она будет нужна далее</para>
 ///</summary>
+///<param name="str">Строка, которую необходимо разделить на лексемы</param>
+///<returns>Возвращает массив строк, разбитых по " \t". Последняя строка = NULL</returns>
 char** strtoarr (char* str);
 ///<summary>
-///<remarks>Функция пытается найти и выполнить встроенные возможности терминала: exit, cd, njobs, nkill</remarks>
+///<para>Функция пытается найти и выполнить встроенные возможности терминала: exit, cd, njobs, nkill итд</para>
+///</summary>
 ///<param name="prm">Массив параметров</param>
-///<returns>Возвращает:
+///<returns>
 ///1, если ключевое слово найдено и выполнилось(кроме exit); 
 ///0, если ключевое слово не найдено; 
-///-1, если необходимо завершить работу терминала(exit)</returns>
-///</summary>
+///-1, если необходимо завершить работу терминала(exit)
+///</returns>
 int    shexec   (char** prm);
+///<summary>
+///<para>Функция выполнить программу, путь к которой задается в первом аргументе</para>
+///</summary>
+///<param name="args">Массив параметров</param>
+///<param name="isBackground">Должен ли процесс запустится в фоне (1-да,0-нет)</param>
+///<returns>
+///nothing - при успехе
+///false - при неудаче
+///</returns>
 int    execute  (char** args,  int isBackground);
+///<summary>
+///<para>Обработчик прерывания SIGTERM</para>
+///</summary>
+///<returns>nothing</returns>
 void   intsignal(int sig);
+///<summary>
+///<para>Обработчик прерывания SIGCHLD</para>
+///</summary>
+///<returns>nothing</returns>
+void   endedprocess(int sig);
+///<summary>
+///<para>Показать список команд в консоль</para>
+///</summary>
+///<returns>nothing</returns>
+void   ShowHelp();
+int killjobs();
 struct bgproc{
+	int status;      //1 if working, 0 if ended
 	pid_t pid;       //process ID
 	char name[256];  //максимальная длина имени файла в Linux - 255
 };
-/*
-int flagkilljobs=0;
-signal(SIGINT,intsignal);
-void intsignal(){
-	flagkilljobs=1;
-	return 0;
-}
-while(1){
-	...
-	if(flagkilljobs==1){
-		nkill(jobs);
-	}
-}
-*/
-/*
-int flagAvil=0;
-signal(SIGINT,intsignal);
-void intsignal(){
-	if(flagAvil){
-		nkill(jobs)
-	}
-	else
-	{
-		flagkilljobs=1;
-	}
-}
-while(1){
-	...
-	flagAvail=0;
-	...
-	if(flagkilljobs=1){
-		nkill(jobs);
-		flagkilljobs=0;
-	}
-	flagAvail=1;
-}
-*/
 /*ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ*/
 int flagAvail = 1;
+int flagKill  = 0;
 int 	maxproccnt   = STARTPROCCNT;	//максимальное количество процессов
 int 	curproccnt   = 0;				//количество процессов в фоне
-struct bgproc* jobs;//массив процессов в фоне
+struct bgproc* jobs;                    //массив процессов в фоне
+/*ТОЧКА ВХОДА В ПРОГРАММУ*/
 int main()
 {
 	jobs  = malloc(sizeof(struct bgproc) * maxproccnt);
 	signal(SIGINT,intsignal);
 	signal(SIGTERM,intsignal);
+	signal(SIGCHLD,endedprocess);
 	char* 	line         = NULL;			//строка для ввода
     size_t 	size         = 0;				//размер буфера
 	int     isBackground = false;			//флаг фонового режима запуска
 	char**  args;							//массив аргументов
+	ShowHelp();
 	while (true){
 		printf("> ");
 	
@@ -128,6 +125,11 @@ int main()
 
 void intsignal(int sig){
 	printf("int signal\n");
+	if(flagAvail==1){
+		killjobs();
+	}else{
+		printf("Some important work doing now. \nTry later\n");
+	}
 }
 
 char** strtoarr(char* str)
@@ -169,14 +171,26 @@ int shexec(char** prm){
 	}
 	if(strcmp(prm[0], "njobs") == 0){
 		flagAvail=0;
-		if(curproccnt==0){
-			printf("no bg jobs\n");
-		}
 			printf("jobs:\n");
+		if(curproccnt==0){printf("no bg jobs\n");}
 		for(int i=0; i<curproccnt;i++){
-			printf("  [%i:%i]\t%s\n",i,jobs[i].pid,jobs[i].name);
+			printf("  [%i:%i]\t%s\t%s\n",i,jobs[i].pid,jobs[i].name,jobs[i].status?"working":"ended");
 		}
 		flagAvail=1;
+		return true;
+	}
+	if(strcmp(prm[0], "nhelp") == 0){
+		ShowHelp();
+		return true;
+	}
+	if(strcmp(prm[0], "nkill") == 0){
+		if(flagAvail == 1){
+			killjobs();
+		}
+		else
+		{
+			printf("error\n");
+		}
 		return true;
 	}
 	return false;
@@ -197,20 +211,60 @@ int execute(char** args, int isBackground){
     else//if parent
     {
 		if(isBackground){
-			printf("bg [%d: %d]\n", curproccnt, pidChild);//TODO
+			printf("bg [%d: %d]\n", curproccnt, pidChild);
 			flagAvail=0;
 			jobs[curproccnt].pid = pidChild;
-			memcpy(jobs[curproccnt].name,args[0],strlen(args[0])+1);
+			memcpy(jobs[curproccnt].name, args[0], strlen(args[0])+1);
+			jobs[curproccnt].status = 1;
 			curproccnt++;
-			// printf("\t[%i]\t%s",jobs[curproccnt].pid,jobs[curproccnt].name);
-			flagAvail=1;
+			flagAvail = 1;
 		}
 		else{
-			waitpid(pidChild, 0,0);
+			waitpid(pidChild, 0, 0);
 			return true;
 		}
     }
 }//end execute
 int killjobs(){
-	
+		flagAvail=0;
+		
+			printf("kill jobs\n");
+		for(int i=0; i<curproccnt;i++){
+			printf("  [%i:%i]\t%s\n",i,jobs[i].pid,jobs[i].name);
+			if(jobs[i].status == 1)
+			{
+				if(kill(jobs[i].pid, SIGKILL) == -1){
+					//perror("Cannot kill process: ");
+				}
+			}
+			wait(&jobs[i].pid);
+		}
+		curproccnt = 0;
+		flagAvail=1;
+		return true;
+}
+void endedprocess(int sig){
+	pid_t pid;
+    int status;
+    while((pid = waitpid(-1,&status,WNOHANG)) > 0){   
+	if(WIFEXITED(status)){
+		for(int i = 0; i < curproccnt;i++){
+			if(jobs[i].pid==pid){
+				jobs[i].status=0;
+			}
+		}
+	}
+    }
+
+}
+void ShowHelp(){
+	printf("\
+		COMMANDS\n\
+cd      - Change directory\n\
+njobs   - Show background jobs\n\
+nhelp   - Show this\n\
+nkill   - Kill all BG jobs (the same that Ctrl+C)\n\
+exit    - Exit program\n\
+");
+return;
 }
